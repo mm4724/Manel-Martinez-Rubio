@@ -1,0 +1,52 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import odeint
+
+# Defines the SIR model with zombies and computes changes over time
+def sir_with_zombies(y, t, beta, gamma, zeta):
+    S, I, Z, R = y
+    dSdt = -beta * S * I  # Calculates how the susceptible population decreases due to infections
+    dIdt = beta * S * I - gamma * I  # Computes the rate of change for the infected population
+    dZdt = gamma * I - zeta * Z  # Determines the growth or decline of the zombie population
+    dRdt = zeta * Z  # Tracks how the recovered population increases from eliminated zombies
+    return [dSdt, dIdt, dZdt, dRdt]
+
+# Sets the initial parameters for the simulation
+total_population = 8_000_000_000  # Specifies the total population size
+initial_infected = 800_000  # Number of infected individuals at the start
+initial_zombies = 0  # Number of zombies at the beginning
+initial_recovered = 0  # Number of recovered individuals at the start
+initial_susceptible = total_population - initial_infected - initial_zombies - initial_recovered
+
+# Defines the rates that govern the system
+beta = 0.00001  # Rate at which individuals get infected
+gamma = 0.1  # Rate of zombification from infected individuals
+zeta = 0.001  # Rate at which zombies are eliminated
+
+# Sets the initial conditions for the simulation
+initial_conditions = [initial_susceptible, initial_infected, initial_zombies, initial_recovered]
+
+# Specifies the time range for the simulation
+time = np.linspace(0, 100, 500)  # Simulates over 100 days, dividing the period into 500 points
+
+# Solves the differential equations using the odeint function
+solution = odeint(sir_with_zombies, initial_conditions, time, args=(beta, gamma, zeta))
+
+# Extracts the results for each compartment (Susceptible, Infected, Zombies, Recovered)
+S, I, Z, R = solution.T
+
+# Configures the font style for the plot
+plt.rcParams["font.family"] = "serif"
+
+# Creates the plot for visualizing the simulation results
+plt.figure(figsize=(10, 6))
+plt.plot(time, S, label='Susceptible (S)', lw=2, color='green')  # Plots the susceptible population
+plt.plot(time, I, label='Infected (I)', lw=2, color='lime')  # Plots the infected population
+plt.plot(time, Z, label='Zombies (Z)', lw=2, color='darkgreen')  # Plots the zombie population
+plt.plot(time, R, label='Recovered (R)', lw=2, color='forestgreen')  # Plots the recovered population
+plt.title('Basic SIR Model with Zombies', fontsize=16)  # Adds a title to the plot
+plt.xlabel('Time (days)', fontsize=14)  # Labels the x-axis
+plt.ylabel('Number of Individuals', fontsize=14)  # Labels the y-axis
+plt.legend()  # Adds a legend to distinguish the curves
+plt.grid()  # Displays a grid for easier reading of the plot
+plt.show()  # Renders and displays the plot
