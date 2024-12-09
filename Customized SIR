@@ -1,0 +1,90 @@
+import numpy as np
+from scipy.integrate import odeint
+import matplotlib.pyplot as plt
+
+# Sets global parameters for the models
+N = 8e9  # Total population size
+beta_default = 0.2  # Default infection transmission rate
+delta = 1 / (20 * 365)  # Decomposition rate of zombies (equivalent to a 20-year average lifespan)
+birth_rate_per_capita = 18.5 / 1000 / 365  # Daily birth rate per capita
+natural_death_rate_per_capita = 7.7 / 1000 / 365  # Daily natural death rate per capita
+phigh = 0.9  # Probability of immunity when both parents are immune
+plow = 0.01  # Probability of immunity when neither parent is immune
+
+# Specifies durations for each type of zombie phase (in days)
+runner_duration = 2 * 365  # Duration of the Runner phase (2 years)
+stalker_duration = 8 * 365  # Duration of the Stalker phase (8 years)
+clicker_duration = 5 * 365  # Duration of the Clicker phase (5 years)
+bloater_duration = 5 * 365  # Duration of the Bloater phase (5 years)
+
+# Defines the SIR model to simulate disease spread
+def sir_model(y, t, N, beta, delta, birth_rate, death_rate, phigh, plow):
+    S, I, R = y
+    B = birth_rate * N  # Daily total births
+    Dn = death_rate * N  # Daily total natural deaths
+    Br = ((R / N) * phigh + (S / N) * plow) * B  # Immune births proportion
+
+    # Differential equations for the SIR model
+    dSdt = B - beta * S * I / N - Dn  # Change in susceptible population
+    dIdt = beta * S * I / N - delta * I  # Change in infected population
+    dRdt = Br  # Change in immune population
+    return [dSdt, dIdt, dRdt]
+
+# Defines the extended zombie type model for infection dynamics
+def zombie_model(y, t, N, beta, delta, birth_rate, death_rate, phigh, plow):
+    S, I_R, I_S, I_C, I_B, R = y
+    B = birth_rate * N  # Daily total births
+    Dn = death_rate * N  # Daily total natural deaths
+    Br = ((R / N) * phigh + (S / N) * plow) * B  # Immune births proportion
+
+    # Total infected population across all zombie types
+    I_total = I_R + I_S + I_C + I_B
+
+    # Differential equations for each population group
+    dSdt = B - beta * S * I_total / N - Dn  # Change in susceptible population
+    dI_Rdt = beta * S * I_total / N - I_R / runner_duration  # Change in Runner zombies
+    dI_Sdt = I_R / runner_duration - I_S / stalker_duration  # Change in Stalker zombies
+    dI_Cdt = I_S / stalker_duration - I_C / clicker_duration  # Change in Clicker zombies
+    dI_Bdt = I_C / clicker_duration - I_B / bloater_duration  # Change in Bloater zombies
+    dRdt = Br  # Change in immune population
+    return [dSdt, dI_Rdt, dI_Sdt, dI_Cdt, dI_Bdt, dRdt]
+
+# Sets initial conditions for the SIR model
+S0 = 7_999_199_000  # Initial susceptible population
+I0 = 1_000  # Initial infected population
+R0 = 800_000  # Initial immune population
+initial_conditions_sir = [S0, I0, R0]
+
+# Sets initial conditions for the zombie model
+I_R0, I_S0, I_C0, I_B0 = 1_000, 0, 0, 0  # Initial infected population split by zombie type
+initial_conditions_zombie = [S0, I_R0, I_S0, I_C0, I_B0, R0]
+
+# Defines time ranges for simulations
+t_short = np.linspace(0, 180, 500)  # 6 months
+t_mid = np.linspace(0, 365 * 10, 1000)  # 10 years
+t_long = np.linspace(0, 365 * 500, 1000)  # 500 years
+t_zombie = np.linspace(0, 365 * 20, 1000)  # 20 years
+
+# Solves the SIR model equations with default transmission rates
+solution_sir_short_default = odeint(sir_model, initial_conditions_sir, t_short, args=(N, beta_default, delta, birth_rate_per_capita, natural_death_rate_per_capita, phigh, plow))
+solution_sir_mid_default = odeint(sir_model, initial_conditions_sir, t_mid, args=(N, beta_default, delta, birth_rate_per_capita, natural_death_rate_per_capita, phigh, plow))
+solution_sir_long_default = odeint(sir_model, initial_conditions_sir, t_long, args=(N, beta_default, delta, birth_rate_per_capita, natural_death_rate_per_capita, phigh, plow))
+
+# Solves the zombie model equations
+solution_zombie = odeint(zombie_model, initial_conditions_zombie, t_zombie, args=(N, beta_default, delta, birth_rate_per_capita, natural_death_rate_per_capita, phigh, plow))
+
+# Extracts results for the SIR model and zombie model
+S_short, I_short, R_short = solution_sir_short_default.T
+S_zombie, I_R, I_S, I_C, I_B, R_zombie = solution_zombie.T
+
+# Creates a plot for the short-term SIR model simulation
+plt.figure(figsize=(10, 6))
+plt.plot(t_short, S_short, label='Susceptibles ($S$)', color='limegreen')  # Susceptible population
+plt.plot(t_short, I_short, label='Infected ($I$)', color='forestgreen')  # Infected population
+plt.plot(t_short, R_short, label='Immune ($R$)', color='darkgreen')  # Immune population
+plt.title('Short-Term Simulation (6 Months, $\\beta = 0.2$)', fontsize=14)  # Adds a title to the plot
+plt.xlabel('Time (days)')  # Labels the x-axis
+plt.ylabel('Population')  # Labels the y-axis
+plt.legend()  # Adds a legend for clarity
+plt.grid(alpha=0.5)  # Adds a grid to the plot for better readability
+plt.show()  # Displays the plot
